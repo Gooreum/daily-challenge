@@ -1,0 +1,29 @@
+name: Notify Slack on merge to main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    # 머지 커밋이 있을 때만 (브랜치 삭제 등 head_commit 없는 push 제외)
+    if: ${{ github.event.head_commit != null }}
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          MSG: ${{ github.event.head_commit.message }}
+          URL: ${{ github.event.head_commit.url }}
+          COMPARE: ${{ github.event.compare }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::error::SLACK_WEBHOOK_URL secret 이 설정되지 않았습니다."
+            exit 1
+          fi
+          text=$(printf '🚀 *%s* — main에 머지됨\n👤 %s\n📝 %s\n🔗 <%s|커밋 보기> · <%s|변경 비교>' \
+            "$REPO" "$ACTOR" "$MSG" "$URL" "$COMPARE")
+          jq -n --arg t "$text" '{text: $t}' \
+            | curl -sS -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK_URL"
