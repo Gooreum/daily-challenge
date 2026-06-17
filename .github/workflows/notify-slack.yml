@@ -1,4 +1,4 @@
-name: Notify Slack on merge to main
+name: Notify Slack on study log
 
 on:
   push:
@@ -7,23 +7,22 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    # 머지 커밋이 있을 때만 (브랜치 삭제 등 head_commit 없는 push 제외)
-    if: ${{ github.event.head_commit != null }}
+    # 학습 기록 커밋(commitStudyLog가 만드는 "study: ..." 메시지)일 때만 알림.
+    # 코드/CI/기타 커밋은 제외한다.
+    if: ${{ github.event.head_commit != null && startsWith(github.event.head_commit.message, 'study:') }}
     steps:
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          REPO: ${{ github.repository }}
           ACTOR: ${{ github.actor }}
           MSG: ${{ github.event.head_commit.message }}
           URL: ${{ github.event.head_commit.url }}
-          COMPARE: ${{ github.event.compare }}
         run: |
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
             echo "::error::SLACK_WEBHOOK_URL secret 이 설정되지 않았습니다."
             exit 1
           fi
-          text=$(printf '🚀 *%s* — main에 머지됨\n👤 %s\n📝 %s\n🔗 <%s|커밋 보기> · <%s|변경 비교>' \
-            "$REPO" "$ACTOR" "$MSG" "$URL" "$COMPARE")
+          # MSG 예: "study: [동시성] 1. async/await 기초 학습 기록 (8문항)"
+          text=$(printf '📚 *학습 완료!*\n%s\n👤 %s\n🔗 <%s|기록 보기>' "$MSG" "$ACTOR" "$URL")
           jq -n --arg t "$text" '{text: $t}' \
             | curl -sS -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK_URL"
